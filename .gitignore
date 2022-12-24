@@ -1,0 +1,15 @@
+mpm-data/
+training_outputs/logs
+deployment/common/__pycache__
+deployment/draw/__pycache__
+deployment/online/__pycache__
+deployment/online/Experiments/__pycache__
+deployment/online/util/__pycache__
+offline_training_stress_only/__pycache__
+offline_training_u/__pycache__
+offline_training_xhat_and_C/__pycache__
+offline_training_xhat_and_stress_and_mu/__pycache__
+sampling_geometry/__pycache__
+engine_stress/__pycache__
+
+
