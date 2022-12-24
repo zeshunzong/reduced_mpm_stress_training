@@ -18,7 +18,7 @@ mpm_solver = MPM_Simulator_WARP(10)
 mpm_solver.load_from_sampling("/initial_data/sand_column_large/sand_column_large170_initial_sampling.h5", n_grid = 200)
 print(mpm_solver.n_particles)
 
-input()
+# input()
 angle = 30
 mpm_solver.set_parameters(mu = 100000.0, lam = 0.3, material='sand', friction_angle = angle, g = 9.8, density = 2200.0)
 mpm_solver.add_surface_collider((0.0, 0.58, 0.0), (0.0,1.0,0.0), 'sticky', 0.0)

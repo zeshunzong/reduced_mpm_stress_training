@@ -122,9 +122,9 @@ class MPM_Simulator_WARP:
             density_value = kwargs['density']
             wp.launch(kernel = set_value_to_float_array, dim=self.n_particles,inputs=[self.mpm_state.particle_density, density_value], device=device)
             wp.launch(kernel = get_float_array_product, dim=self.n_particles, inputs=[self.mpm_state.particle_density, self.mpm_state.particle_vol, self.mpm_state.particle_mass], device=device)
-        print("mean particle vol: ", torch.mean(wp.to_torch(self.mpm_state.particle_vol)))
-        print("mean particle mass: ", torch.mean(wp.to_torch(self.mpm_state.particle_mass)))
-        input()
+        # print("mean particle vol: ", torch.mean(wp.to_torch(self.mpm_state.particle_vol)))
+        # print("mean particle mass: ", torch.mean(wp.to_torch(self.mpm_state.particle_mass)))
+        # input()
 
     def load_from_sampling(self, sampling_h5, n_grid = 100, grid_lim = 1.0, device = "cuda:0"):
         if not os.path.exists(os.getcwd() + sampling_h5):
