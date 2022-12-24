@@ -1,0 +1,1 @@
+# reduced_mpm_stress_training
