@@ -19,7 +19,7 @@ Full Network
 '''
 
 class CROMnet(pl.LightningModule):
-    def __init__(self, data_format, preprop_params, example_input_array, initial_lr, batch_size, lbl, scale_mlp, ks, strides, siren_enc, siren_dec, enc_omega_0, dec_omega_0, verbose, lr, epo, schedule, loaded_from=None):
+    def __init__(self, data_format, preprop_params, example_input_array, initial_lr, batch_size, lbl, scale_mlp, dec_depth, ks, strides, siren_enc, siren_dec, enc_omega_0, dec_omega_0, verbose, lr, epo, schedule, loaded_from=None):
         super(CROMnet, self).__init__()
 
         #data specific parameters
@@ -48,6 +48,7 @@ class CROMnet(pl.LightningModule):
         #network structure parameters (things we can change for network)
         self.lbllength = lbl
         self.scale_mlp = scale_mlp
+        self.dec_depth = dec_depth
         self.ks = ks
         self.strides = strides
         self.siren_enc = siren_enc
@@ -58,8 +59,8 @@ class CROMnet(pl.LightningModule):
         self.criterion = nn.MSELoss()
 
         self.encoder = NetEnc(data_format, self.lbllength, self.ks, self.strides, self.siren_enc, self.enc_omega_0)
-        self.decoder_displacement = NetDec_displacement(data_format, self.lbllength, self.scale_mlp[0], self.siren_dec, self.dec_omega_0)
-        self.decoder_stress = NetDec_stress(data_format, self.lbllength, self.scale_mlp[1], self.siren_dec, self.dec_omega_0)
+        self.decoder_displacement = NetDec_displacement(data_format, self.lbllength, self.scale_mlp[0], self.dec_depth[0], self.siren_dec, self.dec_omega_0)
+        self.decoder_stress = NetDec_stress(data_format, self.lbllength, self.scale_mlp[1], self.dec_depth[1], self.siren_dec, self.dec_omega_0)
 
         self.sim_state_list = []
 
@@ -79,6 +80,7 @@ class CROMnet(pl.LightningModule):
             self.decoder_stress.prepare.set_params(self.preprop_params)
             
             self.encoder.standardizeQ.set_params(self.preprop_params)
+            self.encoder.clipQ.set_params(self.preprop_params)
         
         if stage == "test":
 
@@ -217,6 +219,7 @@ class CROMnet(pl.LightningModule):
 
         rank_zero_info('lbllength: ' + str(self.lbllength))
         rank_zero_info('scale_mlp: ' + str(self.scale_mlp))
+        rank_zero_info('dec_depth: ' + str(self.dec_depth))
         rank_zero_info('siren enc: ' + str(self.siren_enc))
         if self.siren_enc:
             rank_zero_info('\tomega_0: ' + str(self.enc_omega_0))
@@ -268,7 +271,7 @@ Decoder Network displacement
 '''
 
 class NetDec_displacement(pl.LightningModule):
-    def __init__(self, data_format, lbllength, scale_mlp, siren, omega_0):
+    def __init__(self, data_format, lbllength, scale_mlp, dec_depth, siren, omega_0):
         super(NetDec_displacement, self).__init__()
 
         self.lbllength = lbllength
@@ -277,14 +280,6 @@ class NetDec_displacement(pl.LightningModule):
         self.omega_0 = omega_0
 
         self.dec0 = nn.Linear(lbllength + data_format['i_dim'], data_format['i_dim'] * scale_mlp)
-        self.dec1 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
-        self.dec2 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
-        self.dec3 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
-        self.dec4 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
         self.enc = nn.Linear(data_format['i_dim'] * scale_mlp,
                               data_format['o_dim'])
 
@@ -292,18 +287,16 @@ class NetDec_displacement(pl.LightningModule):
         self.invStandardizeQ = invStandardizeQ(data_format, 'displacement')
         self.prepare = Prepare(self.lbllength, self.siren, data_format)
 
-        self.layers = []
+        self.layers = nn.ModuleList()
         self.layers.append(self.prepare)
         self.layers.append(self.dec0)
         self.layers.append(self.act)
-        self.layers.append(self.dec1)
-        self.layers.append(self.act)
-        self.layers.append(self.dec2)
-        self.layers.append(self.act)
-        self.layers.append(self.dec3)
-        self.layers.append(self.act)
-        self.layers.append(self.dec4)
-        self.layers.append(self.act)
+
+        for _ in range(dec_depth - 1):
+            self.layers.append(nn.Linear(data_format['i_dim'] * scale_mlp,
+                              data_format['i_dim'] * scale_mlp))
+            self.layers.append(self.act)
+
         self.layers.append(self.enc)
         self.layers.append(self.invStandardizeQ)
 
@@ -370,7 +363,7 @@ Decoder Network stress
 '''
 
 class NetDec_stress(pl.LightningModule):
-    def __init__(self, data_format, lbllength, scale_mlp, siren, omega_0):
+    def __init__(self, data_format, lbllength, scale_mlp, dec_depth, siren, omega_0):
         super(NetDec_stress, self).__init__()
 
         self.lbllength = lbllength
@@ -381,33 +374,22 @@ class NetDec_stress(pl.LightningModule):
         self.data_format = data_format
 
         self.dec0 = nn.Linear(lbllength + data_format['i_dim'] + data_format['mu_dim'], data_format['i_dim'] * scale_mlp)
-        self.dec1 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
-        self.dec2 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
-        self.dec3 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
-        self.dec4 = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              data_format['i_dim'] * scale_mlp)
-        self.enc = nn.Linear(data_format['i_dim'] * scale_mlp,
-                              6)
+        self.enc = nn.Linear(data_format['i_dim'] * scale_mlp, 6)
 
         self.act = Activation(self.siren, self.omega_0)
         self.invStandardizeQ = invStandardizeQ(data_format, 'stress')
         self.prepare = Prepare(self.lbllength, self.siren, data_format)
 
-        self.layers = []
+        self.layers = nn.ModuleList()
         #self.layers.append(self.prepare)
         self.layers.append(self.dec0)
         self.layers.append(self.act)
-        self.layers.append(self.dec1)
-        self.layers.append(self.act)
-        self.layers.append(self.dec2)
-        self.layers.append(self.act)
-        self.layers.append(self.dec3)
-        self.layers.append(self.act)
-        self.layers.append(self.dec4)
-        self.layers.append(self.act)
+
+        for _ in range(dec_depth - 1):
+            self.layers.append(nn.Linear(data_format['i_dim'] * scale_mlp,
+                              data_format['i_dim'] * scale_mlp))
+            self.layers.append(self.act)
+
         self.layers.append(self.enc)
         self.layers.append(self.invStandardizeQ)
 
@@ -548,6 +530,7 @@ class NetEnc(pl.LightningModule):
         self.enc11 = nn.Linear(32, lbllength)
 
         self.standardizeQ = standardizeQ(data_format)
+        self.clipQ = clipQ(data_format)
         self.act = Activation(self.siren, self.omega_0)
 
         self.init_weights()
@@ -583,7 +566,10 @@ class NetEnc(pl.LightningModule):
                                              1 / self.ks)
 
     def forward(self, state):
-        state = self.standardizeQ(state)
+        if self.siren:
+            state = self.clipQ(state)
+        else:
+            state = self.standardizeQ(state)
 
         state = torch.transpose(state, 1, 2)
         
@@ -616,6 +602,22 @@ class standardizeQ(nn.Module):
 
     def forward(self, q):
         return (q - self.mean_q_torch) / self.std_q_torch
+
+class clipQ(nn.Module):
+    def __init__(self, data_format):
+        super(clipQ, self).__init__()
+        self.register_buffer('min_q_torch', torch.zeros(data_format['o_dim']))
+        self.register_buffer('max_q_torch', torch.zeros(data_format['o_dim']))
+
+    
+    def set_params(self, preprop_params):
+
+        self.min_q_torch = torch.from_numpy(preprop_params['min_q_displacement']).float()
+        self.max_q_torch = torch.from_numpy(preprop_params['max_q_displacement']).float()
+
+    def forward(self, q):
+        # return (q - self.mean_q_torch) / self.std_q_torch
+        return 2 * (q - self.min_q_torch) / (self.max_q_torch - self.min_q_torch) - 1
 
 class Activation(nn.Module):
     def __init__(self, siren, omega_0):

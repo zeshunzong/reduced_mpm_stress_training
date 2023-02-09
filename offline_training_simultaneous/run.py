@@ -99,7 +99,9 @@ def main():
     parser.add_argument('-lbl', help='label length',
                     type=int, required=False, default=8)  
     parser.add_argument('-scale_mlp', help='scale mlp',
-                    type=list, required=False, default=[24,60])
+                    type=int, nargs='*', required=False, default=[24,60])
+    parser.add_argument('-dec_depth', help='decoder depth',
+                    type=int, nargs='*', required=False, default=[8,8])
     parser.add_argument('-ks', help='scale mlp',
                     type=int, required=False, default=6)
     parser.add_argument('-strides', help='scale mlp',

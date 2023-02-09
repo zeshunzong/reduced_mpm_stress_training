@@ -141,16 +141,59 @@ class SimulationDataModule(pl.LightningDataModule):
             self.min_x = np.load(f)
             self.max_x = np.load(f)
 
+    def computeMinAndMaxQ(self):
+        # displacement
+        preprocessed_file = os.path.join(
+            self.sim_dataset.data_path, 'minandmax_q.npy')
+        if os.path.exists(preprocessed_file):
+            pass
+        else:
+            qs = map(self.gQ_displacement, range(len(self.sim_dataset)))
+            qs = np.vstack(qs)
+            self.min_q_displacement = np.min(qs, axis=0)
+            self.max_q_displacement = np.max(qs, axis=0)
+
+        # write
+            with open(preprocessed_file, 'wb') as f:
+                np.save(f, self.min_q_displacement)
+                np.save(f, self.max_q_displacement)
+        
+        with open(preprocessed_file, 'rb') as f:
+            self.min_q_displacement = np.load(f)
+            self.max_q_displacement = np.load(f)
+
+        # stress
+        preprocessed_file = os.path.join(
+            self.sim_dataset.data_path, 'minandmax_stress.npy')
+        if os.path.exists(preprocessed_file):
+            pass
+        else:
+            qs = map(self.gQ_stress, range(len(self.sim_dataset)))
+            qs = np.vstack(qs)
+            self.min_q_stress = np.min(qs, axis=0)
+            self.max_q_stress = np.max(qs, axis=0)
+
+        # write
+            with open(preprocessed_file, 'wb') as f:
+                np.save(f, self.min_q_stress)
+                np.save(f, self.max_q_stress)
+        
+        with open(preprocessed_file, 'rb') as f:
+            self.min_q_stress = np.load(f)
+            self.max_q_stress = np.load(f)
+
     def computeStandardizeTransformation(self):
         
         self.computeMeanAndStdQ()
         self.computeMeanAndStdX()
         self.computeMinAndMaxX()
+        self.computeMinAndMaxQ()
     
     def get_dataParams(self,): 
 
         return {'mean_q_displacement': self.mean_q_displacement, 'std_q_displacement': self.std_q_displacement, \
         'mean_q_stress': self.mean_q_stress, 'std_q_stress': self.std_q_stress, \
+        'min_q_displacement': self.min_q_displacement, 'max_q_displacement': self.max_q_displacement,\
         'mean_x': self.mean_x, 'std_x': self.std_x, 'min_x': self.min_x, 'max_x': self.max_x}
 
     def get_dataFormat(self, ):
